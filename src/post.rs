@@ -1,29 +1,11 @@
 use actix_multipart::Multipart;
-use futures::{StreamExt, TryStreamExt};
 use actix_web::{HttpRequest, HttpResponse};
 use async_std::prelude::*;
+use futures::{StreamExt, TryStreamExt};
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
 use sanitize_filename::sanitize;
-use serde::Serialize;
 use std::{env, io};
-
-#[derive(Serialize)]
-struct ReturnData {
-    file: String,
-    host: String,
-    protocol: String,
-    url: String,
-}
-
-impl ReturnData {
-    fn new(_file:&str, _host: &str, _protocol: &str) -> Self {
-        Self {
-            file: String::from(_file),
-            host: String::from(_host),
-            protocol: String::from(_protocol),
-            url: format!("{}://{}/{}", _protocol, _host, _file),
-        }
-    }
-}
 
 const ROOT_DIR: &'static str = "/files/";
 
@@ -44,11 +26,15 @@ pub async fn post(req: HttpRequest, mut payload: Multipart) -> Result<HttpRespon
         return Ok(HttpResponse::Unauthorized().body("Invalid key provided"));
     }
 
+    let rand_stuff: String = thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(4)
+        .map(char::from)
+        .collect();
+
     let mut filename = String::from("");
     while let Ok(Some(mut field)) = payload.try_next().await {
-        filename = sanitize(
-            field.content_disposition().unwrap().get_filename().unwrap(),
-        );
+        filename = format!("{}-{}", rand_stuff, sanitize(field.content_disposition().unwrap().get_filename().unwrap()));
         let filepath = format!("{}{}", ROOT_DIR, filename);
         let mut f = async_std::fs::File::create(filepath).await?;
 
@@ -57,5 +43,5 @@ pub async fn post(req: HttpRequest, mut payload: Multipart) -> Result<HttpRespon
             f.write_all(&data).await?;
         }
     }
-    Ok(HttpResponse::Ok().body(serde_json::to_string(&ReturnData::new(&filename, "f.weirdnatto.in", "https")).unwrap()))
+    Ok(HttpResponse::Ok().body(format!("https://f.weirdnatto.in/{}", filename)))
 }
