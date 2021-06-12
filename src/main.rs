@@ -6,10 +6,10 @@ use std::{io, path::PathBuf};
 const ROOT_DIR: &str = "/files/";
 
 async fn get_file(req: HttpRequest) -> Result<NamedFile,io::Error> {
-    let file_name = req.match_info().get("file").unwrap_or("default");
+    let file_name = req.match_info().get("file").unwrap();
     let file_path: PathBuf = format!("{}{}", ROOT_DIR, file_name).parse().unwrap();
     match NamedFile::open(file_path) {
-        Ok(file) => Ok(file),
+        Ok(file) => Ok(file.disable_content_disposition()),
         Err(_) => Err(io::Error::new(
             io::ErrorKind::Other,
             "No such file there, bhay",
